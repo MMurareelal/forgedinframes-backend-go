@@ -66,6 +66,7 @@ func main() {
 	blogsH := handlers.NewBlogsHandler(cfg, fbClient)
 	storageH := handlers.NewStorageHandler(cfg, fbClient)
 	usersH := handlers.NewUsersHandler(cfg, fbClient)
+	analyticsH := handlers.NewAnalyticsHandler(cfg, fbClient)
 
 	// Health Check
 	router.GET("/health", healthH.Health)
@@ -153,9 +154,13 @@ func main() {
 			users.POST("/:uid", authRateMW, authMW, usersH.SyncUser)
 			users.GET("/:uid", authMW, usersH.GetUser)
 		}
-	}
 
-	_ = optionalAuthMW // available for optional auth routes
+		// Analytics Routes (GA4)
+		analytics := api.Group("/analytics")
+		{
+			analytics.GET("/ga4/summary", optionalAuthMW, analyticsH.GetGA4Summary)
+		}
+	}
 
 	// 404 Route Handler
 	router.NoRoute(func(c *gin.Context) {

@@ -33,6 +33,7 @@ type Config struct {
 	MutationLimitMaxRequests int
 	MaxFileSizeBytes         int64
 	TrustProxy               bool
+	GA4PropertyID            string
 }
 
 // LoadConfig loads environment variables from .env files and environment
@@ -123,6 +124,7 @@ func LoadConfig() *Config {
 		MutationLimitMaxRequests: mutationLimitMax,
 		MaxFileSizeBytes:         maxFileSize,
 		TrustProxy:               trustProxy,
+		GA4PropertyID:            getEnv("GA4_PROPERTY_ID", ""),
 	}
 }
 

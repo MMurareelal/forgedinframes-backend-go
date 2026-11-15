@@ -27,6 +27,7 @@ type Client struct {
 	BucketHandle    *storage.BucketHandle
 	CredentialType  string
 	TargetProjectID string
+	ClientOptions   []option.ClientOption
 }
 
 func parseServiceAccountBytes(raw string) ([]byte, error) {
@@ -122,5 +123,6 @@ func InitFirebase(ctx context.Context, cfg *config.Config) (*Client, error) {
 		BucketHandle:    bucketHandle,
 		CredentialType:  credSource,
 		TargetProjectID: cfg.FirebaseProjectID,
+		ClientOptions:   opts,
 	}, nil
 }

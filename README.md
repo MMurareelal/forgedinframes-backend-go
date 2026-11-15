@@ -123,6 +123,9 @@ forgedinframes-backend-go/
 - `POST /api/users/:uid` - (Protected) Sync/upsert user profile with atomic RBAC check
 - `GET /api/users/:uid` - (Protected) Get user profile
 
+### Analytics & Telemetry (`/api/analytics`)
+- `GET /api/analytics/ga4/summary` - Queries Google Analytics 4 via the Google Analytics Data API (`timeRange=24h|7d|30d|all`). Returns KPIs, time-series, device and browser breakdowns with graceful fallback when `GA4_PROPERTY_ID` is unconfigured.
+
 ---
 
 ## Configuration

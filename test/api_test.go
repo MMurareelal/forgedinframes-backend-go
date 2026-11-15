@@ -37,6 +37,7 @@ func setupTestRouter() *gin.Engine {
 	authH := handlers.NewAuthHandler(cfg, nil)
 	photosH := handlers.NewPhotosHandler(cfg, nil)
 	blogsH := handlers.NewBlogsHandler(cfg, nil)
+	analyticsH := handlers.NewAnalyticsHandler(cfg, nil)
 
 	router.GET("/health", healthH.Health)
 	router.GET("/api/health", healthH.Health)
@@ -57,6 +58,11 @@ func setupTestRouter() *gin.Engine {
 		blogs := api.Group("/blogs")
 		{
 			blogs.GET("/", blogsH.GetAllBlogs)
+		}
+
+		analytics := api.Group("/analytics")
+		{
+			analytics.GET("/ga4/summary", analyticsH.GetGA4Summary)
 		}
 	}
 
@@ -166,5 +172,35 @@ func TestLogout(t *testing.T) {
 	_ = json.Unmarshal(w.Body.Bytes(), &resp)
 	if resp["success"] != true {
 		t.Errorf("Expected success: true")
+	}
+}
+
+func TestGA4SummaryFallback(t *testing.T) {
+	router := setupTestRouter()
+
+	w := httptest.NewRecorder()
+	req, _ := http.NewRequest("GET", "/api/analytics/ga4/summary?timeRange=7d", nil)
+	router.ServeHTTP(w, req)
+
+	// Since GA4_PROPERTY_ID is unset in test config, it must return 503 with fallback indicator
+	if w.Code != http.StatusServiceUnavailable {
+		t.Fatalf("Expected status 503 Service Unavailable, got %d", w.Code)
+	}
+
+	var resp map[string]interface{}
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("Failed to parse JSON: %v", err)
+	}
+
+	if resp["connected"] != false {
+		t.Errorf("Expected connected: false, got %v", resp["connected"])
+	}
+
+	if resp["source"] != "client_fallback" {
+		t.Errorf("Expected source: 'client_fallback', got '%v'", resp["source"])
+	}
+
+	if resp["error"] != "GA4_PROPERTY_ID is not configured on backend" {
+		t.Errorf("Expected GA4_PROPERTY_ID error message, got '%v'", resp["error"])
 	}
 }

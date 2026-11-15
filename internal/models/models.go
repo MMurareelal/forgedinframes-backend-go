@@ -160,3 +160,91 @@ func (c *CommentCreateRequest) GetText() string {
 	}
 	return strings.TrimSpace(c.Comment)
 }
+
+// --- Analytics Models (GA4 Reporting) ---
+
+type AnalyticsTimeSeriesPoint struct {
+	Date     string `json:"date"`
+	Views    int    `json:"views"`
+	Visitors int    `json:"visitors"`
+}
+
+type AnalyticsCategoryBreakdown struct {
+	Name       string `json:"name"`
+	Views      int    `json:"views"`
+	Percentage int    `json:"percentage"`
+}
+
+type AnalyticsTopPhoto struct {
+	ID             string `json:"id"`
+	Title          string `json:"title"`
+	Category       string `json:"category"`
+	Views          int    `json:"views"`
+	EngagementRate int    `json:"engagementRate"`
+	ThumbnailURL   string `json:"thumbnailUrl,omitempty"`
+}
+
+type AnalyticsTopBlog struct {
+	ID          string `json:"id"`
+	Title       string `json:"title"`
+	Reads       int    `json:"reads"`
+	AvgReadTime string `json:"avgReadTime"`
+}
+
+type AnalyticsDeviceBreakdown struct {
+	Desktop int `json:"desktop"`
+	Mobile  int `json:"mobile"`
+	Tablet  int `json:"tablet"`
+}
+
+type AnalyticsBrowserBreakdown struct {
+	Browser    string `json:"browser"`
+	Percentage int    `json:"percentage"`
+}
+
+type AnalyticsReferrerBreakdown struct {
+	Source     string `json:"source"`
+	Count      int    `json:"count"`
+	Percentage int    `json:"percentage"`
+}
+
+type AnalyticsEvent struct {
+	ID        string                 `json:"id"`
+	Type      string                 `json:"type"`
+	Path      string                 `json:"path"`
+	Title     string                 `json:"title,omitempty"`
+	Timestamp int64                  `json:"timestamp"`
+	SessionID string                 `json:"sessionId"`
+	Device    string                 `json:"device"`
+	Browser   string                 `json:"browser"`
+	OS        string                 `json:"os"`
+	Referrer  string                 `json:"referrer,omitempty"`
+	Metadata  map[string]interface{} `json:"metadata,omitempty"`
+}
+
+type AnalyticsSummary struct {
+	TotalViews             int                          `json:"totalViews"`
+	UniqueVisitors         int                          `json:"uniqueVisitors"`
+	AvgDwellSeconds        int                          `json:"avgDwellSeconds"`
+	TotalPhotoInteractions int                          `json:"totalPhotoInteractions"`
+	TimeRange              string                       `json:"timeRange"`
+	ViewsTrend             int                          `json:"viewsTrend"`
+	VisitorsTrend          int                          `json:"visitorsTrend"`
+	InteractionsTrend      int                          `json:"interactionsTrend"`
+	TimeSeries             []AnalyticsTimeSeriesPoint   `json:"timeSeries"`
+	CategoryBreakdown      []AnalyticsCategoryBreakdown `json:"categoryBreakdown"`
+	TopPhotos              []AnalyticsTopPhoto          `json:"topPhotos"`
+	TopBlogs               []AnalyticsTopBlog           `json:"topBlogs"`
+	DeviceBreakdown        AnalyticsDeviceBreakdown     `json:"deviceBreakdown"`
+	BrowserBreakdown       []AnalyticsBrowserBreakdown  `json:"browserBreakdown"`
+	ReferrerBreakdown      []AnalyticsReferrerBreakdown `json:"referrerBreakdown"`
+	RecentEvents           []AnalyticsEvent             `json:"recentEvents"`
+}
+
+type GA4SummaryResponse struct {
+	Connected  bool             `json:"connected"`
+	Source     string           `json:"source"`
+	PropertyID string           `json:"propertyId,omitempty"`
+	Summary    AnalyticsSummary `json:"summary"`
+	Error      string           `json:"error,omitempty"`
+}
