@@ -100,6 +100,8 @@ func (h *AnalyticsHandler) GetGA4Summary(c *gin.Context) {
 		browserErr     error
 		referrerReport *analyticsdata.RunReportResponse
 		referrerErr    error
+		locationReport *analyticsdata.RunReportResponse
+		locationErr    error
 	)
 
 	// 1. Core KPIs Report
@@ -191,6 +193,32 @@ func (h *AnalyticsHandler) GetGA4Summary(c *gin.Context) {
 			},
 			Metrics: []*analyticsdata.Metric{
 				{Name: "activeUsers"},
+			},
+			Limit: 10,
+		}).Context(ctx).Do()
+	}()
+
+	// 6. Geographic / Location Breakdown (Top Countries)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		locationReport, locationErr = srv.Properties.RunReport(targetProperty, &analyticsdata.RunReportRequest{
+			DateRanges: []*analyticsdata.DateRange{
+				{StartDate: startDate, EndDate: "today"},
+			},
+			Dimensions: []*analyticsdata.Dimension{
+				{Name: "country"},
+			},
+			Metrics: []*analyticsdata.Metric{
+				{Name: "activeUsers"},
+			},
+			OrderBys: []*analyticsdata.OrderBy{
+				{
+					Desc: true,
+					Metric: &analyticsdata.MetricOrderBy{
+						MetricName: "activeUsers",
+					},
+				},
 			},
 			Limit: 10,
 		}).Context(ctx).Do()
@@ -322,6 +350,34 @@ func (h *AnalyticsHandler) GetGA4Summary(c *gin.Context) {
 		}
 	}
 
+	// Parse Location Breakdown
+	locationBreakdown := make([]models.AnalyticsLocationBreakdown, 0)
+	if locationErr == nil && locationReport != nil {
+		var totalLocUsers int
+		for _, row := range locationReport.Rows {
+			if len(row.MetricValues) > 0 {
+				u, _ := strconv.Atoi(row.MetricValues[0].Value)
+				totalLocUsers += u
+			}
+		}
+		if totalLocUsers > 0 {
+			for _, row := range locationReport.Rows {
+				if len(row.DimensionValues) > 0 && len(row.MetricValues) > 0 {
+					cName := row.DimensionValues[0].Value
+					if cName == "" || cName == "(not set)" {
+						cName = "Unknown"
+					}
+					u, _ := strconv.Atoi(row.MetricValues[0].Value)
+					locationBreakdown = append(locationBreakdown, models.AnalyticsLocationBreakdown{
+						Country:    cName,
+						Visitors:   u,
+						Percentage: int(math.Round(float64(u) / float64(totalLocUsers) * 100)),
+					})
+				}
+			}
+		}
+	}
+
 	// Construct response matching exact specification
 	response := models.GA4SummaryResponse{
 		Connected:  true,
@@ -343,6 +399,7 @@ func (h *AnalyticsHandler) GetGA4Summary(c *gin.Context) {
 			DeviceBreakdown:        deviceBreakdown,
 			BrowserBreakdown:       browserBreakdown,
 			ReferrerBreakdown:      referrerBreakdown,
+			LocationBreakdown:      locationBreakdown,
 			RecentEvents:           make([]models.AnalyticsEvent, 0),
 		},
 	}

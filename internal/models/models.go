@@ -208,6 +208,12 @@ type AnalyticsReferrerBreakdown struct {
 	Percentage int    `json:"percentage"`
 }
 
+type AnalyticsLocationBreakdown struct {
+	Country    string `json:"country"`
+	Visitors   int    `json:"visitors"`
+	Percentage int    `json:"percentage"`
+}
+
 type AnalyticsEvent struct {
 	ID        string                 `json:"id"`
 	Type      string                 `json:"type"`
@@ -238,6 +244,7 @@ type AnalyticsSummary struct {
 	DeviceBreakdown        AnalyticsDeviceBreakdown     `json:"deviceBreakdown"`
 	BrowserBreakdown       []AnalyticsBrowserBreakdown  `json:"browserBreakdown"`
 	ReferrerBreakdown      []AnalyticsReferrerBreakdown `json:"referrerBreakdown"`
+	LocationBreakdown      []AnalyticsLocationBreakdown `json:"locationBreakdown"`
 	RecentEvents           []AnalyticsEvent             `json:"recentEvents"`
 }
 
