@@ -151,8 +151,10 @@ func main() {
 		// Users Routes
 		users := api.Group("/users")
 		{
+			users.GET("", authMW, usersH.ListUsers)
 			users.POST("/:uid", authRateMW, authMW, usersH.SyncUser)
 			users.GET("/:uid", authMW, usersH.GetUser)
+			users.PATCH("/:uid/access", authMW, usersH.UpdateUserAccess)
 		}
 
 		// Analytics Routes (GA4)

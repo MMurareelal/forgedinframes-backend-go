@@ -1,7 +1,9 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
+	"sort"
 	"strings"
 	"time"
 
@@ -158,4 +160,105 @@ func (h *UsersHandler) GetUser(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, dbUser)
+}
+
+// ListUsers handles GET /api/users (Admin-only: list all registered users)
+func (h *UsersHandler) ListUsers(c *gin.Context) {
+	user, ok := middleware.GetUserFromContext(c)
+	if !ok || user.UID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized", "message": "Authentication required."})
+		return
+	}
+
+	if !h.cfg.IsAdminEmail(user.Email) {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error":   "Forbidden",
+			"message": "Only curators with administrative privileges can view the user directory.",
+		})
+		return
+	}
+
+	ctx := c.Request.Context()
+	usersRef := h.fbClient.DBClient.NewRef("users")
+	var usersMap map[string]models.User
+	if err := usersRef.Get(ctx, &usersMap); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch users: " + err.Error()})
+		return
+	}
+
+	usersList := make([]models.User, 0, len(usersMap))
+	for _, u := range usersMap {
+		if u.UID != "" {
+			usersList = append(usersList, u)
+		}
+	}
+
+	// Sort newest first by LastLoginAt / CreatedAt
+	sort.Slice(usersList, func(i, j int) bool {
+		if usersList[i].LastLoginAt != usersList[j].LastLoginAt {
+			return usersList[i].LastLoginAt > usersList[j].LastLoginAt
+		}
+		return usersList[i].CreatedAt > usersList[j].CreatedAt
+	})
+
+	c.JSON(http.StatusOK, usersList)
+}
+
+// UpdateUserAccess handles PATCH /api/users/:uid/access (Admin-only: update user permissions)
+func (h *UsersHandler) UpdateUserAccess(c *gin.Context) {
+	uid := c.Param("uid")
+	if !models.IsSafeKey(uid) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid Parameter", "message": "Parameter contains invalid characters."})
+		return
+	}
+
+	adminUser, ok := middleware.GetUserFromContext(c)
+	if !ok || adminUser.UID == "" {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized", "message": "Authentication required."})
+		return
+	}
+
+	if !h.cfg.IsAdminEmail(adminUser.Email) {
+		c.JSON(http.StatusForbidden, gin.H{
+			"error":   "Forbidden",
+			"message": "Only curators with administrative privileges can modify user permissions.",
+		})
+		return
+	}
+
+	var req models.AccessList
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid Body", "message": "Valid AccessList payload required."})
+		return
+	}
+
+	ctx := c.Request.Context()
+	userRef := h.fbClient.DBClient.NewRef("users/" + uid)
+
+	var updatedUser models.User
+	fn := func(node db.TransactionNode) (interface{}, error) {
+		var current models.User
+		if err := node.Unmarshal(&current); err != nil || current.UID == "" {
+			return nil, fmt.Errorf("user not found")
+		}
+
+		// Prevent revoking permissions of primary owner
+		if h.cfg.IsAdminEmail(current.Email) {
+			req.PhotosEditAccess = true
+			req.BlogsEditAccess = true
+			req.EditorAccess = true
+			req.UploadEditAccess = true
+		}
+
+		current.AccessList = req
+		updatedUser = current
+		return current, nil
+	}
+
+	if err := userRef.Transaction(ctx, fn); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update user access: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, updatedUser)
 }
