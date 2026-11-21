@@ -189,6 +189,11 @@ func (h *UsersHandler) ListUsers(c *gin.Context) {
 	usersList := make([]models.User, 0, len(usersMap))
 	for _, u := range usersMap {
 		if u.UID != "" {
+			if u.ProfilePicture != "" && u.PhotoURL == "" {
+				u.PhotoURL = u.ProfilePicture
+			} else if u.PhotoURL != "" && u.ProfilePicture == "" {
+				u.ProfilePicture = u.PhotoURL
+			}
 			usersList = append(usersList, u)
 		}
 	}

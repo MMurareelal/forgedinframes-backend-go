@@ -38,6 +38,7 @@ type User struct {
 	Name           string     `json:"name"`
 	Email          string     `json:"email"`
 	ProfilePicture string     `json:"profile_picture"`
+	PhotoURL       string     `json:"photoURL,omitempty"`
 	AccessList     AccessList `json:"accessList"`
 	CreatedAt      string     `json:"createdAt,omitempty"`
 	LastLoginAt    string     `json:"lastLoginAt,omitempty"`
