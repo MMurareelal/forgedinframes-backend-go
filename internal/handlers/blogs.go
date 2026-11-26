@@ -97,6 +97,16 @@ func (h *BlogsHandler) AddBlog(c *gin.Context) {
 		req["createdAt"] = time.Now().UTC().Format(time.RFC3339)
 	}
 
+	// Auto-generate an unDraw-style SVG cover if no cover image was provided
+	existingImage, _ := req["image"].(string)
+	if strings.TrimSpace(existingImage) == "" && h.fbClient != nil && h.fbClient.BucketHandle != nil {
+		summaryStr, _ := req["summary"].(string)
+		svgContent, _ := GenerateStoryCoverSVG(ctx, h.cfg, title, summaryStr, content)
+		if publicURL, _, err := UploadCoverSVG(ctx, h.cfg, h.fbClient, title, svgContent); err == nil {
+			req["image"] = publicURL
+		}
+	}
+
 	blogRef := h.fbClient.DBClient.NewRef("blogPosts")
 	newRef, err := blogRef.Push(ctx, req)
 	if err != nil {
@@ -106,6 +116,44 @@ func (h *BlogsHandler) AddBlog(c *gin.Context) {
 
 	req["id"] = newRef.Key
 	c.JSON(http.StatusCreated, req)
+}
+
+// POST /api/blogs/generate-cover
+func (h *BlogsHandler) GenerateCover(c *gin.Context) {
+	if h.fbClient == nil || h.fbClient.BucketHandle == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Storage bucket handle not available."})
+		return
+	}
+
+	var req struct {
+		Title   string `json:"title"`
+		Summary string `json:"summary"`
+		Content string `json:"content"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body: " + err.Error()})
+		return
+	}
+
+	if strings.TrimSpace(req.Title) == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Story title is required to generate a cover."})
+		return
+	}
+
+	ctx := c.Request.Context()
+	svgContent, source := GenerateStoryCoverSVG(ctx, h.cfg, req.Title, req.Summary, req.Content)
+	publicURL, fileName, err := UploadCoverSVG(ctx, h.cfg, h.fbClient, req.Title, svgContent)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to upload generated SVG cover: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success":   true,
+		"publicUrl": publicURL,
+		"fileName":  fileName,
+		"source":    source,
+	})
 }
 
 // PUT /api/blogs/:blogpost and /updateblog/:blogpost
@@ -264,7 +312,7 @@ func (h *BlogsHandler) AddComment(c *gin.Context) {
 		ActorAvatar: req.PostedByProfilePicture,
 		TargetID:    blogID,
 		TargetTitle: blogTitle,
-		TargetPath:  "/blogs/" + blogID,
+		TargetPath:  "/journal/" + blogID + "#comments",
 		CreatedAt:   newComment.CreatedAt,
 	})
 

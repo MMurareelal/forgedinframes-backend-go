@@ -34,6 +34,8 @@ type Config struct {
 	MaxFileSizeBytes         int64
 	TrustProxy               bool
 	GA4PropertyID            string
+	GeminiAPIKey             string
+	GeminiModel              string
 }
 
 // LoadConfig loads environment variables from .env files and environment
@@ -125,6 +127,8 @@ func LoadConfig() *Config {
 		MaxFileSizeBytes:         maxFileSize,
 		TrustProxy:               trustProxy,
 		GA4PropertyID:            getEnv("GA4_PROPERTY_ID", ""),
+		GeminiAPIKey:             getEnv("GEMINI_API_KEY", ""),
+		GeminiModel:              getEnv("GEMINI_MODEL", "gemini-2.5-flash"),
 	}
 }
 

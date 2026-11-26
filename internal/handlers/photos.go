@@ -355,7 +355,7 @@ func (h *PhotosHandler) LikePhoto(c *gin.Context) {
 			ActorAvatar: avatar,
 			TargetID:    photoUID,
 			TargetTitle: photoTitle,
-			TargetPath:  "/photos/" + strings.ToLower(categoryType),
+			TargetPath:  "/photos/" + strings.ToLower(categoryType) + "?photo=" + photoUID,
 			CreatedAt:   time.Now().UTC().Format(time.RFC3339),
 		})
 	}

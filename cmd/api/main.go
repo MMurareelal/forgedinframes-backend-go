@@ -115,6 +115,7 @@ func main() {
 
 			blogs.POST("/", mutationRateMW, authMW, requireBlogsMW, blogsH.AddBlog)
 			blogs.POST("/addblog", mutationRateMW, authMW, requireBlogsMW, blogsH.AddBlog)
+			blogs.POST("/generate-cover", mutationRateMW, authMW, requireBlogsMW, blogsH.GenerateCover)
 
 			blogs.PUT("/:blogpost", mutationRateMW, authMW, requireBlogsMW, blogsH.UpdateBlog)
 			blogs.PUT("/updateblog/:blogpost", mutationRateMW, authMW, requireBlogsMW, blogsH.UpdateBlog)
