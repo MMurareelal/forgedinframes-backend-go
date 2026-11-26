@@ -6,6 +6,8 @@ import (
 	"log"
 	"math"
 	"net/http"
+	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -104,6 +106,8 @@ func (h *AnalyticsHandler) GetGA4Summary(c *gin.Context) {
 		locationErr    error
 		pageReport     *analyticsdata.RunReportResponse
 		pageErr        error
+		blogReport     *analyticsdata.RunReportResponse
+		blogErr        error
 	)
 
 	// 1. Core KPIs Report
@@ -251,6 +255,43 @@ func (h *AnalyticsHandler) GetGA4Summary(c *gin.Context) {
 				},
 			},
 			Limit: 10,
+		}).Context(ctx).Do()
+	}()
+
+	// 8. Field Journals Breakdown (/journal/*)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		blogReport, blogErr = srv.Properties.RunReport(targetProperty, &analyticsdata.RunReportRequest{
+			DateRanges: []*analyticsdata.DateRange{
+				{StartDate: startDate, EndDate: "today"},
+			},
+			Dimensions: []*analyticsdata.Dimension{
+				{Name: "pagePath"},
+				{Name: "pageTitle"},
+			},
+			Metrics: []*analyticsdata.Metric{
+				{Name: "screenPageViews"},
+				{Name: "userEngagementDuration"},
+			},
+			DimensionFilter: &analyticsdata.FilterExpression{
+				Filter: &analyticsdata.Filter{
+					FieldName: "pagePath",
+					StringFilter: &analyticsdata.StringFilter{
+						MatchType: "BEGINS_WITH",
+						Value:     "/journal/",
+					},
+				},
+			},
+			OrderBys: []*analyticsdata.OrderBy{
+				{
+					Desc: true,
+					Metric: &analyticsdata.MetricOrderBy{
+						MetricName: "screenPageViews",
+					},
+				},
+			},
+			Limit: 25,
 		}).Context(ctx).Do()
 	}()
 
@@ -443,6 +484,12 @@ func (h *AnalyticsHandler) GetGA4Summary(c *gin.Context) {
 		}
 	}
 
+	// Parse Field Journals Breakdown
+	topBlogs := make([]models.AnalyticsTopBlog, 0)
+	if blogErr == nil && blogReport != nil {
+		topBlogs = parseTopBlogs(blogReport)
+	}
+
 	// Construct response matching exact specification
 	response := models.GA4SummaryResponse{
 		Connected:  true,
@@ -461,7 +508,7 @@ func (h *AnalyticsHandler) GetGA4Summary(c *gin.Context) {
 			CategoryBreakdown:      make([]models.AnalyticsCategoryBreakdown, 0),
 			PageBreakdown:          pageBreakdown,
 			TopPhotos:              make([]models.AnalyticsTopPhoto, 0),
-			TopBlogs:               make([]models.AnalyticsTopBlog, 0),
+			TopBlogs:               topBlogs,
 			DeviceBreakdown:        deviceBreakdown,
 			BrowserBreakdown:       browserBreakdown,
 			ReferrerBreakdown:      referrerBreakdown,
@@ -471,4 +518,89 @@ func (h *AnalyticsHandler) GetGA4Summary(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, response)
+}
+
+// parseTopBlogs aggregates GA4 /journal/* page rows into ranked Field Journal metrics.
+func parseTopBlogs(report *analyticsdata.RunReportResponse) []models.AnalyticsTopBlog {
+	if report == nil {
+		return make([]models.AnalyticsTopBlog, 0)
+	}
+
+	type blogAgg struct {
+		title       string
+		reads       int
+		engagementS int
+	}
+
+	byID := make(map[string]*blogAgg)
+	for _, row := range report.Rows {
+		if len(row.DimensionValues) < 2 || len(row.MetricValues) < 2 {
+			continue
+		}
+		pPath := strings.TrimSpace(row.DimensionValues[0].Value)
+		if !strings.HasPrefix(pPath, "/journal/") {
+			continue
+		}
+		rawSlug := strings.TrimSuffix(strings.TrimPrefix(pPath, "/journal/"), "/")
+		if rawSlug == "" {
+			continue
+		}
+		decodedSlug, err := url.PathUnescape(rawSlug)
+		if err != nil || decodedSlug == "" {
+			decodedSlug = rawSlug
+		}
+
+		pTitle := strings.TrimSpace(row.DimensionValues[1].Value)
+		pTitle = strings.TrimSuffix(pTitle, " | ForgedInFrames")
+		pTitle = strings.TrimSpace(pTitle)
+		if pTitle == "" || pTitle == "(not set)" || pTitle == "ForgedInFrames" {
+			pTitle = decodedSlug
+		}
+
+		reads, _ := strconv.Atoi(row.MetricValues[0].Value)
+		engSecFloat, _ := strconv.ParseFloat(row.MetricValues[1].Value, 64)
+		engSec := int(math.Round(engSecFloat))
+
+		entry, exists := byID[decodedSlug]
+		if !exists {
+			byID[decodedSlug] = &blogAgg{
+				title:       pTitle,
+				reads:       reads,
+				engagementS: engSec,
+			}
+		} else {
+			entry.reads += reads
+			entry.engagementS += engSec
+			if entry.title == decodedSlug && pTitle != decodedSlug {
+				entry.title = pTitle
+			}
+		}
+	}
+
+	topBlogs := make([]models.AnalyticsTopBlog, 0, len(byID))
+	for id, agg := range byID {
+		avgReadTime := "—"
+		if agg.reads > 0 && agg.engagementS > 0 {
+			avgSec := int(math.Round(float64(agg.engagementS) / float64(agg.reads)))
+			avgReadTime = fmt.Sprintf("%dm %ds", avgSec/60, avgSec%60)
+		}
+		topBlogs = append(topBlogs, models.AnalyticsTopBlog{
+			ID:          id,
+			Title:       agg.title,
+			Reads:       agg.reads,
+			AvgReadTime: avgReadTime,
+		})
+	}
+
+	sort.Slice(topBlogs, func(i, j int) bool {
+		if topBlogs[i].Reads != topBlogs[j].Reads {
+			return topBlogs[i].Reads > topBlogs[j].Reads
+		}
+		return topBlogs[i].Title < topBlogs[j].Title
+	})
+
+	if len(topBlogs) > 10 {
+		topBlogs = topBlogs[:10]
+	}
+	return topBlogs
 }
