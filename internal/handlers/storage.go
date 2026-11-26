@@ -20,10 +20,11 @@ import (
 )
 
 var allowedMIMETypes = map[string]bool{
-	"image/jpeg": true,
-	"image/jpg":  true,
-	"image/png":  true,
-	"image/webp": true,
+	"image/jpeg":    true,
+	"image/jpg":     true,
+	"image/png":     true,
+	"image/webp":    true,
+	"image/svg+xml": true,
 }
 
 var nonAlphanumericRegex = regexp.MustCompile(`[^a-zA-Z0-9._-]`)
@@ -144,7 +145,7 @@ func (h *StorageHandler) UploadPhoto(c *gin.Context) {
 	// Validate MIME type
 	contentType := fileHeader.Header.Get("Content-Type")
 	if !allowedMIMETypes[contentType] {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid file type. Only JPEG, PNG, and WebP images are allowed."})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid file type. Only JPEG, PNG, WebP, and SVG images are allowed."})
 		return
 	}
 
