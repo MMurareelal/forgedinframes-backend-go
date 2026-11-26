@@ -22,7 +22,7 @@ func TestParseTopBlogs(t *testing.T) {
 			{
 				DimensionValues: []*analyticsdata.DimensionValue{
 					{Value: "/journal/Optical%20Reflections"},
-					{Value: "ForgedInFrames"},
+					{Value: "ForgedInFrames | Murareelal Meghwal"},
 				},
 				MetricValues: []*analyticsdata.MetricValue{
 					{Value: "5"},

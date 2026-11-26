@@ -551,9 +551,11 @@ func parseTopBlogs(report *analyticsdata.RunReportResponse) []models.AnalyticsTo
 		}
 
 		pTitle := strings.TrimSpace(row.DimensionValues[1].Value)
+		pTitle = strings.TrimSuffix(pTitle, " | ForgedInFrames | Murareelal Meghwal")
 		pTitle = strings.TrimSuffix(pTitle, " | ForgedInFrames")
+		pTitle = strings.TrimSuffix(pTitle, " | Murareelal Meghwal")
 		pTitle = strings.TrimSpace(pTitle)
-		if pTitle == "" || pTitle == "(not set)" || pTitle == "ForgedInFrames" {
+		if pTitle == "" || pTitle == "(not set)" || pTitle == "ForgedInFrames" || strings.HasPrefix(pTitle, "ForgedInFrames |") {
 			pTitle = decodedSlug
 		}
 
