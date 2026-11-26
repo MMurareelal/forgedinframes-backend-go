@@ -235,6 +235,39 @@ func (h *BlogsHandler) AddComment(c *gin.Context) {
 		return
 	}
 
+	// Notify admins about new journal comment
+	blogTitle := blogID
+	var titleVal string
+	if err := h.fbClient.DBClient.NewRef(fmt.Sprintf("blogPosts/%s/title", blogID)).Get(ctx, &titleVal); err == nil && titleVal != "" {
+		blogTitle = titleVal
+	}
+	actorName := req.PostedBy
+	if actorName == "" {
+		actorName = req.UserName
+	}
+	if actorName == "" {
+		actorName = user.Email
+	}
+	if actorName == "" {
+		actorName = "A visitor"
+	}
+	snippet := content
+	if len(snippet) > 120 {
+		snippet = snippet[:117] + "..."
+	}
+	CreateAdminNotification(ctx, h.fbClient, models.AdminNotification{
+		Type:        "blog_comment",
+		Title:       "New comment on journal entry",
+		Message:     snippet,
+		ActorUID:    user.UID,
+		ActorName:   actorName,
+		ActorAvatar: req.PostedByProfilePicture,
+		TargetID:    blogID,
+		TargetTitle: blogTitle,
+		TargetPath:  "/blogs/" + blogID,
+		CreatedAt:   newComment.CreatedAt,
+	})
+
 	c.JSON(http.StatusCreated, gin.H{
 		"id":                     pushRef.Key,
 		"content":                newComment.Content,

@@ -67,6 +67,7 @@ func main() {
 	storageH := handlers.NewStorageHandler(cfg, fbClient)
 	usersH := handlers.NewUsersHandler(cfg, fbClient)
 	analyticsH := handlers.NewAnalyticsHandler(cfg, fbClient)
+	notifH := handlers.NewNotificationsHandler(cfg, fbClient)
 
 	// Health Check
 	router.GET("/health", healthH.Health)
@@ -161,6 +162,15 @@ func main() {
 		analytics := api.Group("/analytics")
 		{
 			analytics.GET("/ga4/summary", optionalAuthMW, analyticsH.GetGA4Summary)
+		}
+
+		// Admin Notifications Routes
+		notifications := api.Group("/notifications", authMW)
+		{
+			notifications.GET("", notifH.ListNotifications)
+			notifications.PATCH("/read-all", notifH.MarkAllAsRead)
+			notifications.PATCH("/:id/read", notifH.MarkAsRead)
+			notifications.DELETE("/:id", notifH.DeleteNotification)
 		}
 	}
 

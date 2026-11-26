@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"firebase.google.com/go/v4/db"
@@ -325,6 +326,38 @@ func (h *PhotosHandler) LikePhoto(c *gin.Context) {
 	if err := likesRef.Transaction(ctx, fn); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Transaction failed: " + err.Error()})
 		return
+	}
+
+	if currentEvent == "Liked" {
+		photoTitle := photoUID
+		var titleVal string
+		if err := h.fbClient.DBClient.NewRef("PhotoContainer/"+categoryType+"/images/"+photoUID+"/title").Get(ctx, &titleVal); err == nil && titleVal != "" {
+			photoTitle = titleVal
+		}
+		actorName := user.Email
+		var dbUser models.User
+		if err := h.fbClient.DBClient.NewRef("users/"+user.UID).Get(ctx, &dbUser); err == nil && dbUser.Name != "" {
+			actorName = dbUser.Name
+		}
+		if actorName == "" {
+			actorName = "A visitor"
+		}
+		avatar := dbUser.PhotoURL
+		if avatar == "" {
+			avatar = dbUser.ProfilePicture
+		}
+		CreateAdminNotification(ctx, h.fbClient, models.AdminNotification{
+			Type:        "photo_like",
+			Title:       "New like on photograph",
+			Message:     actorName + " liked \"" + photoTitle + "\" in " + categoryType,
+			ActorUID:    user.UID,
+			ActorName:   actorName,
+			ActorAvatar: avatar,
+			TargetID:    photoUID,
+			TargetTitle: photoTitle,
+			TargetPath:  "/photos/" + strings.ToLower(categoryType),
+			CreatedAt:   time.Now().UTC().Format(time.RFC3339),
+		})
 	}
 
 	finalLikes.CurrentEvent = currentEvent

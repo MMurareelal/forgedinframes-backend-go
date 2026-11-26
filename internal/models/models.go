@@ -265,3 +265,25 @@ type GA4SummaryResponse struct {
 	Summary    AnalyticsSummary `json:"summary"`
 	Error      string           `json:"error,omitempty"`
 }
+
+// --- Admin Notifications Models ---
+
+type AdminNotification struct {
+	ID          string `json:"id"`
+	Type        string `json:"type"` // "blog_comment" | "photo_like"
+	Title       string `json:"title"`
+	Message     string `json:"message"`
+	ActorUID    string `json:"actorUid"`
+	ActorName   string `json:"actorName"`
+	ActorAvatar string `json:"actorAvatar,omitempty"`
+	TargetID    string `json:"targetId"`
+	TargetTitle string `json:"targetTitle,omitempty"`
+	TargetPath  string `json:"targetPath"`
+	Read        bool   `json:"read"`
+	CreatedAt   string `json:"createdAt"`
+}
+
+type NotificationsResponse struct {
+	Notifications []AdminNotification `json:"notifications"`
+	UnreadCount   int                 `json:"unreadCount"`
+}
