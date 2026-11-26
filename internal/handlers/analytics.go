@@ -102,6 +102,8 @@ func (h *AnalyticsHandler) GetGA4Summary(c *gin.Context) {
 		referrerErr    error
 		locationReport *analyticsdata.RunReportResponse
 		locationErr    error
+		pageReport     *analyticsdata.RunReportResponse
+		pageErr        error
 	)
 
 	// 1. Core KPIs Report
@@ -217,6 +219,34 @@ func (h *AnalyticsHandler) GetGA4Summary(c *gin.Context) {
 					Desc: true,
 					Metric: &analyticsdata.MetricOrderBy{
 						MetricName: "activeUsers",
+					},
+				},
+			},
+			Limit: 10,
+		}).Context(ctx).Do()
+	}()
+
+	// 7. Per-Page Views Breakdown (Top Pages)
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		pageReport, pageErr = srv.Properties.RunReport(targetProperty, &analyticsdata.RunReportRequest{
+			DateRanges: []*analyticsdata.DateRange{
+				{StartDate: startDate, EndDate: "today"},
+			},
+			Dimensions: []*analyticsdata.Dimension{
+				{Name: "pagePath"},
+				{Name: "pageTitle"},
+			},
+			Metrics: []*analyticsdata.Metric{
+				{Name: "screenPageViews"},
+				{Name: "activeUsers"},
+			},
+			OrderBys: []*analyticsdata.OrderBy{
+				{
+					Desc: true,
+					Metric: &analyticsdata.MetricOrderBy{
+						MetricName: "screenPageViews",
 					},
 				},
 			},
@@ -378,6 +408,41 @@ func (h *AnalyticsHandler) GetGA4Summary(c *gin.Context) {
 		}
 	}
 
+	// Parse Per-Page Views Breakdown
+	pageBreakdown := make([]models.AnalyticsPageBreakdown, 0)
+	if pageErr == nil && pageReport != nil {
+		var totalPageViews int
+		for _, row := range pageReport.Rows {
+			if len(row.MetricValues) > 0 {
+				v, _ := strconv.Atoi(row.MetricValues[0].Value)
+				totalPageViews += v
+			}
+		}
+		if totalPageViews > 0 {
+			for _, row := range pageReport.Rows {
+				if len(row.DimensionValues) >= 2 && len(row.MetricValues) >= 2 {
+					pPath := row.DimensionValues[0].Value
+					if pPath == "" || pPath == "(not set)" {
+						pPath = "/"
+					}
+					pTitle := row.DimensionValues[1].Value
+					if pTitle == "" || pTitle == "(not set)" {
+						pTitle = pPath
+					}
+					v, _ := strconv.Atoi(row.MetricValues[0].Value)
+					u, _ := strconv.Atoi(row.MetricValues[1].Value)
+					pageBreakdown = append(pageBreakdown, models.AnalyticsPageBreakdown{
+						Path:           pPath,
+						Title:          pTitle,
+						Views:          v,
+						UniqueVisitors: u,
+						Percentage:     int(math.Round(float64(v) / float64(totalPageViews) * 100)),
+					})
+				}
+			}
+		}
+	}
+
 	// Construct response matching exact specification
 	response := models.GA4SummaryResponse{
 		Connected:  true,
@@ -394,6 +459,7 @@ func (h *AnalyticsHandler) GetGA4Summary(c *gin.Context) {
 			InteractionsTrend:      0,
 			TimeSeries:             timeSeries,
 			CategoryBreakdown:      make([]models.AnalyticsCategoryBreakdown, 0),
+			PageBreakdown:          pageBreakdown,
 			TopPhotos:              make([]models.AnalyticsTopPhoto, 0),
 			TopBlogs:               make([]models.AnalyticsTopBlog, 0),
 			DeviceBreakdown:        deviceBreakdown,

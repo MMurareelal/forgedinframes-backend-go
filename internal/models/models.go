@@ -176,6 +176,14 @@ type AnalyticsCategoryBreakdown struct {
 	Percentage int    `json:"percentage"`
 }
 
+type AnalyticsPageBreakdown struct {
+	Path           string `json:"path"`
+	Title          string `json:"title"`
+	Views          int    `json:"views"`
+	UniqueVisitors int    `json:"uniqueVisitors"`
+	Percentage     int    `json:"percentage"`
+}
+
 type AnalyticsTopPhoto struct {
 	ID             string `json:"id"`
 	Title          string `json:"title"`
@@ -240,6 +248,7 @@ type AnalyticsSummary struct {
 	InteractionsTrend      int                          `json:"interactionsTrend"`
 	TimeSeries             []AnalyticsTimeSeriesPoint   `json:"timeSeries"`
 	CategoryBreakdown      []AnalyticsCategoryBreakdown `json:"categoryBreakdown"`
+	PageBreakdown          []AnalyticsPageBreakdown     `json:"pageBreakdown"`
 	TopPhotos              []AnalyticsTopPhoto          `json:"topPhotos"`
 	TopBlogs               []AnalyticsTopBlog           `json:"topBlogs"`
 	DeviceBreakdown        AnalyticsDeviceBreakdown     `json:"deviceBreakdown"`
